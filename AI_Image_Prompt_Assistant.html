@@ -1,0 +1,212 @@
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AI Prompt Assistant</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f4f4f4;
+      margin: 0;
+      padding: 20px;
+    }
+    .container {
+      max-width: 900px;
+      margin: auto;
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    h1 {
+      text-align: center;
+    }
+    label {
+      display: block;
+      margin-top: 15px;
+      font-weight: bold;
+    }
+    input, select, textarea {
+      width: 100%;
+      padding: 10px;
+      margin-top: 5px;
+      box-sizing: border-box;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    button {
+      margin-top: 20px;
+      padding: 10px 20px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    .prompt-preview {
+      background-color: #f9f9f9;
+      padding: 15px;
+      margin-top: 20px;
+      border-left: 5px solid #007bff;
+      white-space: pre-wrap;
+    }
+    .image-gallery {
+      display: flex;
+      gap: 10px;
+      margin-top: 20px;
+      flex-wrap: wrap;
+    }
+    .image-gallery img {
+      max-width: 100%;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script>
+    const { useState } = React;
+
+    function App() {
+      const [base, setBase] = useState('');
+      const [style, setStyle] = useState('photorealistic');
+      const [artist, setArtist] = useState('');
+      const [lighting, setLighting] = useState('soft');
+      const [cameraAngle, setCameraAngle] = useState('wide shot');
+      const [quality, setQuality] = useState('high detail');
+      const [numImages, setNumImages] = useState(1);
+      const [apiKey, setApiKey] = useState('');
+      const [generatedPrompt, setGeneratedPrompt] = useState('');
+      const [images, setImages] = useState([]);
+
+      const buildPrompt = () => {
+        return `${base}, in ${style} style inspired by ${artist || "modern artists"}, ${lighting} lighting, ${cameraAngle} view, ${quality}, ultra-detailed, high-resolution`;
+      };
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        const prompt = buildPrompt();
+        setGeneratedPrompt(prompt);
+        if (apiKey && numImages > 0) {
+          generateImages(prompt, numImages, apiKey);
+        }
+      };
+
+      const copyToClipboard = () => {
+        navigator.clipboard.writeText(generatedPrompt).then(() => {
+          alert("Prompt copied to clipboard!");
+        });
+      };
+
+      const generateImages = async (prompt, count, key) => {
+        // Example using Replicate API for image generation
+        const response = await fetch('https://api.replicate.com/v1/predictions', {
+          method: 'POST',
+          headers: {
+            Authorization: `Token ${key}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            version: "stability-ai/sdxl:39ed52f2a78e934b3ba6e2a89f5b1c72deade6ca34cb6b6a1f328dfb70cec287",
+            input: {
+              input: prompt,
+              num_outputs: count
+            }
+          })
+        });
+
+        const data = await response.json();
+        let imageUrlList = [];
+        while (!data.output) {
+          await new Promise(r => setTimeout(r, 2000));
+          const statusRes = await fetch(data.urls.get, {
+            headers: {
+              Authorization: `Token ${key}`
+            }
+          });
+          data = await statusRes.json();
+        }
+
+        if (data.output) {
+          imageUrlList = data.output;
+          setImages(imageUrlList);
+        }
+      };
+
+      return (
+        React.createElement('div', { className: 'container' },
+          React.createElement('h1', null, 'AI Image Prompt Assistant'),
+          React.createElement('form', { onSubmit: handleSubmit },
+            React.createElement('label', null, 'Base Description:', 
+              React.createElement('input', { type: 'text', value: base, onChange: (e) => setBase(e.target.value), placeholder: 'Describe the scene or subject...' })
+            ),
+            React.createElement('label', null, 'Artistic Style:',
+              React.createElement('select', { value: style, onChange: (e) => setStyle(e.target.value) },
+                ['photorealistic', 'cartoon', 'cyberpunk', 'watercolor', 'oil painting'].map(option =>
+                  React.createElement('option', { key: option, value: option }, option)
+                )
+              )
+            ),
+            React.createElement('label', null, 'Reference Artist:',
+              React.createElement('input', { type: 'text', value: artist, onChange: (e) => setArtist(e.target.value), placeholder: 'e.g., Katsuhiro Otomo' })
+            ),
+            React.createElement('label', null, 'Lighting:',
+              React.createElement('select', { value: lighting, onChange: (e) => setLighting(e.target.value) },
+                ['soft', 'dramatic', 'neon', 'natural', 'low-key'].map(option =>
+                  React.createElement('option', { key: option, value: option }, option)
+                )
+              )
+            ),
+            React.createElement('label', null, 'Camera Angle:',
+              React.createElement('select', { value: cameraAngle, onChange: (e) => setCameraAngle(e.target.value) },
+                ['wide shot', 'close-up', 'overhead', 'side view', 'low angle'].map(option =>
+                  React.createElement('option', { key: option, value: option }, option)
+                )
+              )
+            ),
+            React.createElement('label', null, 'Quality Modifiers:',
+              React.createElement('select', { value: quality, onChange: (e) => setQuality(e.target.value) },
+                ['high detail', 'ultra HD', '8k resolution', 'volumetric lighting', 'cinematic'].map(option =>
+                  React.createElement('option', { key: option, value: option }, option)
+                )
+              )
+            ),
+            React.createElement('label', null, 'Number of Images (1-4):',
+              React.createElement('input', { type: 'number', min: 1, max: 4, value: numImages, onChange: (e) => setNumImages(parseInt(e.target.value)) })
+            ),
+            React.createElement('label', null, 'API Key (Replicate):',
+              React.createElement('input', { type: 'text', value: apiKey, onChange: (e) => setApiKey(e.target.value), placeholder: 'Enter your Replicate API token' })
+            ),
+            React.createElement('button', { type: 'submit' }, 'Generate Prompt & Images')
+          ),
+
+          generatedPrompt ? 
+            React.createElement('div', { className: 'prompt-preview' },
+              React.createElement('p', null, generatedPrompt),
+              React.createElement('button', { onClick: copyToClipboard }, 'Copy Prompt')
+            ) : null,
+
+          images.length > 0 ?
+            React.createElement('div', { className: 'image-gallery' },
+              images.map((url, index) =>
+                React.createElement('img', { key: index, src: url, alt: `Generated image ${index + 1}` })
+              )
+            ) : null
+        )
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(React.createElement(App));
+  </script>
+</body>
+</html>
+```
